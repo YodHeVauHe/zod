@@ -1565,7 +1565,7 @@ test("record key schemas compile: formats, checks, numbers, transforms", () => {
     for (const input of inputs) expectMatch(schema, input);
   }
 
-  // Own __proto__ is skipped rather than validated, matching the runtime.
+  // Own __proto__ still runs the key schema and is rejected when it fails, matching the runtime.
   expectMatch(z.record(z.email(), z.number()), JSON.parse('{"__proto__":{"p":1},"a@b.com":1}'));
 
   // Coercion is modelled nowhere, so a coercing key schema is refused outright rather than compiled to the bare type test it would otherwise become.
