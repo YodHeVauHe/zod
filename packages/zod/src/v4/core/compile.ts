@@ -2021,12 +2021,14 @@ function generateRecordCheck(doc: Doc, ctx: CompileContext, schema: SomeType, ac
       );
       if (isLoose) {
         // A loose record keeps a key its schema rejects, copying the value across unvalidated rather than failing the parse.
-        d.write(`if (${outKeyVar} === INVALID) { ${outputVar}[${kVar}] = ${accessor}[${kVar}]; continue; }`);
+        d.write(
+          `if (${outKeyVar} === INVALID) { if (${kVar} !== "__proto__") ${outputVar}[${kVar}] = ${accessor}[${kVar}]; continue; }`
+        );
       } else {
         d.write(`if (${outKeyVar} === INVALID) return INVALID;`);
       }
-      // The guard above tested the input key, but the schema can normalize an ordinary key into __proto__; re-check the one actually written under.
-      d.write(`if (${outKeyVar} === "__proto__") continue;`);
+      // strip an own __proto__ key even when the schema remaps it, and re-check the key we actually write under
+      d.write(`if (${kVar} === "__proto__" || ${outKeyVar} === "__proto__") continue;`);
       // Read once: the raw expression would be evaluated again by the output write below, so an accessor could return an unvalidated second value.
       const valueVar = newVar(ctx);
       d.write(`const ${valueVar} = ${accessor}[${kVar}];`);
@@ -2043,6 +2045,7 @@ function generateRecordCheck(doc: Doc, ctx: CompileContext, schema: SomeType, ac
     accessor,
     kVar,
     (d) => {
+      d.write(`if (${kVar} === "__proto__") continue;`);
       d.write(`const ${valVar} = ${accessor}[${kVar}];`);
       const valOutput = compileChild(d, ctx, def.valueType, valVar);
       d.write(`${outputVar}[${kVar}] = ${valOutput};`);
@@ -2071,7 +2074,7 @@ function emitOwnKeys(
   doc.write(`for (let ${iVar} = 0; ${iVar} < ${keysVar}.length; ${iVar}++) {`);
   doc.indented((d) => {
     d.write(`const ${kVar} = ${keysVar}[${iVar}];`);
-    d.write(`if (${kVar} === "__proto__" || !${propIsEnumerableConst}.call(${accessor}, ${kVar})) continue;`);
+    d.write(`if (!${propIsEnumerableConst}.call(${accessor}, ${kVar})) continue;`);
     body(d);
   });
   doc.write(`}`);

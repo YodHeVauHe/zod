@@ -333,6 +333,25 @@ test("applies transforms on the key schema (#5296)", () => {
   expect(part.parse({ a: "John" })).toEqual({ b: "John" });
 });
 
+test("own __proto__ key that fails the key schema is invalid_key", () => {
+  const schema = z.record(
+    z.string().refine((k) => k === "fr" || k === "de"),
+    z.string()
+  );
+  const result = schema.safeParse(JSON.parse('{"__proto__":"x","fr":"y"}'));
+
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0].code).toBe("invalid_key");
+    expect(result.error.issues[0].path).toEqual(["__proto__"]);
+  }
+
+  const allowed = z.record(z.string().regex(/^__proto__$/), z.string());
+  const parsed: any = allowed.parse(JSON.parse('{"__proto__":"ok"}'));
+  expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
+  expect(Object.prototype.hasOwnProperty.call(parsed, "__proto__")).toBe(false);
+});
+
 test("surfaces key schema refinement failures as invalid_key", () => {
   // refine rejects "b" but it's still in the literal's value set
   const schema = z.record(
